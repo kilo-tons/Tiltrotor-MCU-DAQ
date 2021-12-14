@@ -1,0 +1,6 @@
+[submodule "extlib/libcanard"]
+	path = extlib/libcanard
+	url = https://github.com/dronecan/libcanard.git
+[submodule "Lib/libcanard"]
+	path = Lib/libcanard
+	url = https://github.com/dronecan/libcanard.git
