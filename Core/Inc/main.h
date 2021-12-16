@@ -38,6 +38,8 @@ extern "C" {
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
 
+// Microsec ticks
+extern TIM_HandleTypeDef htim4;
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/
@@ -60,6 +62,11 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define STATUS_LED_Pin GPIO_PIN_13
+#define STATUS_LED_GPIO_Port GPIOC
+#define ENCODER_IN_Pin GPIO_PIN_15
+#define ENCODER_IN_GPIO_Port GPIOB
+#define ENCODER_IN_EXTI_IRQn EXTI15_10_IRQn
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */
@@ -69,5 +76,3 @@ void Error_Handler(void);
 #endif
 
 #endif /* __MAIN_H */
-
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

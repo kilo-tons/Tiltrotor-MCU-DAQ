@@ -54,6 +54,7 @@ void BusFault_Handler(void);
 void UsageFault_Handler(void);
 void DebugMon_Handler(void);
 void TIM1_UP_IRQHandler(void);
+void TIM4_IRQHandler(void);
 void EXTI15_10_IRQHandler(void);
 /* USER CODE BEGIN EFP */
 
@@ -64,5 +65,3 @@ void EXTI15_10_IRQHandler(void);
 #endif
 
 #endif /* __STM32F1xx_IT_H */
-
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

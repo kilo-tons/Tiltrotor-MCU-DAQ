@@ -23,7 +23,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "uavcan.h"
+#include "utils.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -44,6 +45,7 @@
 CAN_HandleTypeDef hcan;
 
 TIM_HandleTypeDef htim3;
+TIM_HandleTypeDef htim4;
 
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
@@ -63,6 +65,7 @@ static void MX_CAN_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_USART2_UART_Init(void);
+static void MX_TIM4_Init(void);
 void UART2_Start(void const * argument);
 void UAVCAN_Start(void const * argument);
 void EncoderReadCallback(void const * argument);
@@ -108,7 +111,17 @@ int main(void)
   MX_USART1_UART_Init();
   MX_TIM3_Init();
   MX_USART2_UART_Init();
+  MX_TIM4_Init();
   /* USER CODE BEGIN 2 */
+
+  uavcan_init();
+
+  /* Activate TIM4 aka microsecond tick interrupt */
+  if (HAL_TIM_Base_Start_IT(&htim4) != HAL_OK) {
+	  /* Trigger Error */
+	  Error_Handler();
+  }
+
 
   /* USER CODE END 2 */
 
@@ -144,7 +157,7 @@ int main(void)
   UART2_TaskHandle = osThreadCreate(osThread(UART2_Task), NULL);
 
   /* definition and creation of UAVCAN_Task */
-  osThreadDef(UAVCAN_Task, UAVCAN_Start, osPriorityNormal, 0, 128);
+  osThreadDef(UAVCAN_Task, UAVCAN_Start, osPriorityNormal, 0, 384);
   UAVCAN_TaskHandle = osThreadCreate(osThread(UAVCAN_Task), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
@@ -291,6 +304,51 @@ static void MX_TIM3_Init(void)
 }
 
 /**
+  * @brief TIM4 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM4_Init(void)
+{
+
+  /* USER CODE BEGIN TIM4_Init 0 */
+
+  /* USER CODE END TIM4_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM4_Init 1 */
+
+  /* USER CODE END TIM4_Init 1 */
+  htim4.Instance = TIM4;
+  htim4.Init.Prescaler = 72-1;
+  htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim4.Init.Period = 65535;
+  htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim4, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim4, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM4_Init 2 */
+
+  /* USER CODE END TIM4_Init 2 */
+
+}
+
+/**
   * @brief USART1 Initialization Function
   * @param None
   * @retval None
@@ -366,15 +424,26 @@ static void MX_GPIO_Init(void)
   GPIO_InitTypeDef GPIO_InitStruct = {0};
 
   /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
-  /*Configure GPIO pin : PB15 */
-  GPIO_InitStruct.Pin = GPIO_PIN_15;
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(STATUS_LED_GPIO_Port, STATUS_LED_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin : STATUS_LED_Pin */
+  GPIO_InitStruct.Pin = STATUS_LED_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(STATUS_LED_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : ENCODER_IN_Pin */
+  GPIO_InitStruct.Pin = ENCODER_IN_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+  HAL_GPIO_Init(ENCODER_IN_GPIO_Port, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/
   HAL_NVIC_SetPriority(EXTI15_10_IRQn, 7, 0);
@@ -414,11 +483,21 @@ void UART2_Start(void const * argument)
 void UAVCAN_Start(void const * argument)
 {
   /* USER CODE BEGIN UAVCAN_Start */
-  /* Infinite loop */
-  for(;;)
-  {
-    osDelay(1);
-  }
+	/* Infinite loop */
+	for(;;)
+	{
+		// Status LED indicator, UAVCAN thread is running
+		static uint32_t timestamp = 0;
+		if (HAL_GetTick() - timestamp > 1000) {
+			HAL_GPIO_TogglePin(STATUS_LED_GPIO_Port, STATUS_LED_Pin);
+			timestamp = HAL_GetTick();
+		}
+
+		sendCanard();
+		receiveCanard();
+		spinCanard();
+		// osDelay(1);
+	}
   /* USER CODE END UAVCAN_Start */
 }
 
@@ -447,7 +526,9 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     HAL_IncTick();
   }
   /* USER CODE BEGIN Callback 1 */
-
+  else if (htim->Instance == TIM4) {
+	  update_tick_us();
+  }
   /* USER CODE END Callback 1 */
 }
 
@@ -483,4 +564,3 @@ void assert_failed(uint8_t *file, uint32_t line)
 }
 #endif /* USE_FULL_ASSERT */
 
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
