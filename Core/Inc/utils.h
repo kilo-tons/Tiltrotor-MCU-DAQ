@@ -19,10 +19,17 @@
 #ifndef UTILS_H
 #define UTILS_H
 
-#include "main.h"
+#include <stdint.h>
 
+// Microsecond tick support
 uint64_t get_time_usec();
 void update_tick_us();
+
+// Constraining functions
+float constrain_float(float low_bound, float high_bound, float val);
+
+// CRC
+uint16_t crc16_ccitt(const uint8_t *buf, uint32_t len, uint16_t crc);
 
 #endif
 

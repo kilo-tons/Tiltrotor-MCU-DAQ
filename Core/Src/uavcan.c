@@ -16,10 +16,25 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <stdint.h>
 #include "uavcan.h"
+#include "can.h"
+#include "stm32f1xx_hal.h"
+#include "utils.h"
+#include "comm.h"
+#include "airspeed.h"
+
+#include "canard.h"
+#include "canard_stm32.h"
+#include <uavcan/equipment/air_data/RawAirData.h>
+#include <uavcan/protocol/GetNodeInfo.h>
+#include <uavcan/protocol/NodeStatus.h>
+
+osMutexId Airspeed_MutexHandle;
+uavcan_airspeed_data_t uavcan_airspeed_data;
 
 static CanardInstance 	g_canard;                     					//The library instance
-static uint8_t 			g_canard_memory_pool[1024];          					//Arena for memory allocation, used by the library
+static uint8_t 			g_canard_memory_pool[1024];          			//Arena for memory allocation, used by the library
 static uint32_t 		spin_uptime = 0;
 
 static void handleGetNodeInfo(CanardRxTransfer* transfer)
@@ -75,6 +90,14 @@ static void handleRawAirData(CanardRxTransfer* transfer)
 
 	const float airspeed = airspeed_read((&raw_air_data)->static_air_temperature,
 										(&raw_air_data)->differential_pressure);
+
+	// Push to uavcan_airspeed_data
+	osMutexWait(Airspeed_MutexHandle, osWaitForever);
+
+	uavcan_airspeed_data.airspeed = airspeed;
+	uavcan_airspeed_data.timestamp = HAL_GetTick();
+
+	osMutexRelease(Airspeed_MutexHandle);
 }
 
 /**
@@ -118,8 +141,14 @@ static bool shouldAcceptTransfer(const CanardInstance* ins,
 }
 
 // Initialize the CAN module with UAVCAN parameters
-void uavcan_init(void)
+void UAVCAN_init(void)
 {
+	memset(&uavcan_airspeed_data, 0, sizeof(uavcan_airspeed_data));
+
+	// Create thread mutex
+	osMutexDef(Airspeed_Mutex);
+	Airspeed_MutexHandle = osMutexCreate(osMutex(Airspeed_Mutex));
+
 	CanardSTM32CANTimings timings;
 	int16_t result = canardSTM32ComputeCANTimings(HAL_RCC_GetPCLK1Freq(), 1000000, &timings);
 

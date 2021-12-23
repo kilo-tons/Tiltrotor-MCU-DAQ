@@ -20,22 +20,24 @@
 #ifndef UAVCAN_H
 #define UAVCAN_H
 
-#include "main.h"
-#include "stm32f1xx_hal.h"
-#include "utils.h"
-
-#include "canard.h"
-#include "canard_stm32.h"
-#include <uavcan/equipment/air_data/RawAirData.h>
-#include <uavcan/protocol/GetNodeInfo.h>
-#include <uavcan/protocol/NodeStatus.h>
-
-#include "airspeed.h"
+#include <stdint.h>
+#include <stdbool.h>
+#include "cmsis_os.h"
 
 #define LOCALNODE_ID 			10
 #define DAQ_NODE_NAME 			"org.hcmut.tiltrotor_daq"
 
-void uavcan_init(void);
+typedef struct
+{
+	float airspeed;
+	uint32_t timestamp;
+
+} uavcan_airspeed_data_t;
+
+extern osMutexId Airspeed_MutexHandle;
+extern uavcan_airspeed_data_t uavcan_airspeed_data;
+
+void UAVCAN_init(void);
 void sendCanard(void);
 void receiveCanard(void);
 void spinCanard(void);
