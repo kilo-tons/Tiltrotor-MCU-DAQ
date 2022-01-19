@@ -18,16 +18,50 @@
 
 #include "utils.h"
 #include "tim.h"
+#include "cmsis_os.h"
+
+// Microsecond tick stuff
 
 // Variable to save old microsecond ticks
-static uint64_t tick_us = 0;
+static uint32_t tick_us32 = 0;
+static uint64_t offset_us64 = 0;
 
-uint64_t get_time_usec()
+// micros64 update lock
+static osMutexId micros64_mutexHandle;
+
+void system_time_us64_init(void)
 {
-	return tick_us + (&htim4)->Instance->CNT;
+	// Create thread mutex
+	osMutexDef(micros64_mutex);
+	micros64_mutexHandle = osMutexCreate(osMutex(micros64_mutex));
 }
 
-void update_tick_us()
+uint32_t get_time_us32()
+{
+	static uint32_t tick_last_us32;
+	uint32_t tick_now_us32 = tick_us32 + (&htim4)->Instance->CNT;
+
+	if (tick_now_us32 < tick_last_us32) {
+		const uint64_t dt_us = 0xFFFFFFFF + 1;
+		offset_us64 += dt_us;
+	}
+	tick_last_us32 = tick_now_us32;
+	return tick_now_us32;
+}
+
+uint64_t get_time_us64()
+{
+	// Lock
+	osMutexWait(micros64_mutexHandle, osWaitForever);
+
+	uint32_t time_us32_now = get_time_us32();
+	uint64_t time_us64_now = time_us32_now + offset_us64;
+
+	osMutexRelease(micros64_mutexHandle);
+	return time_us64_now;
+}
+
+void update_tick_us32()
 {
 	/*
 	 * TIM4 is used as a counter generator for microsecond ticks, and is hardcoded for
@@ -37,7 +71,7 @@ void update_tick_us()
 	 * Re - configure the timer if you port the codes to other STM32 MCUs
 	 */
 
-	tick_us += 0xFFFF - 1;
+	tick_us32 += 0xFFFF + 1;
 }
 
 float constrain_float(float low_bound, float high_bound, float val)

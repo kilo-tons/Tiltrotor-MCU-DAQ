@@ -30,6 +30,8 @@
 #include "tim.h"
 #include "uavcan.h"
 #include "comm.h"
+#include "encoder.h"
+#include "utils.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -101,6 +103,7 @@ void MX_FREERTOS_Init(void) {
 
   /* USER CODE BEGIN RTOS_MUTEX */
   /* add mutexes, ... */
+  system_time_us64_init();
   /* USER CODE END RTOS_MUTEX */
 
   /* USER CODE BEGIN RTOS_SEMAPHORES */
@@ -162,16 +165,20 @@ void CommIO_RdThread(void const * argument)
 		case READ:
 			// Begin respond
 			osSignalSet(CommIO_RpTaskHandle, COMM_RESPOND);
+			htim3.Instance->CCR1 = 1000 - 1;
 			break;
 
 		case WRITE:
 			// Write PWM signal to ESC
-			htim3.Instance->CCR1 = DAQ_input.pwm - 1;
+			// HAL_GPIO_TogglePin(STATUS_LED_GPIO_Port, STATUS_LED_Pin);
+			htim3.Instance->CCR1 = (uint32_t)DAQ_input.pwm - 1;
+			break;
 
 		case STOP:
 			// Stop respond, turn off ESC
 			osSignalSet(CommIO_RpTaskHandle, COMM_IDLE);
 			htim3.Instance->CCR1 = 1000 - 1;
+			break;
 		}
 
 		osMutexRelease(CommIO_inMutexHandle);
@@ -195,14 +202,18 @@ void UAVCAN_Thread(void const * argument)
 	for(;;)
 	{
 
-	if (HAL_GetTick() - timestamp > 1000) {
-		timestamp = HAL_GetTick();
-		HAL_GPIO_TogglePin(STATUS_LED_GPIO_Port, STATUS_LED_Pin);
-	}
+//	if (HAL_GetTick() - timestamp > 1000) {
+//		timestamp = HAL_GetTick();
+//		HAL_GPIO_TogglePin(STATUS_LED_GPIO_Port, STATUS_LED_Pin);
+//	}
 
 	sendCanard();
 	receiveCanard();
 	spinCanard();
+//	char debug_buf[100];
+//	int debug_len = sprintf(debug_buf, "time_us: %d\r\n", (int)get_time_us64());
+//	HAL_UART_Transmit(&huart1, (uint8_t*)debug_buf, debug_len, 1000);
+
 	osDelay(1);
 	}
   /* USER CODE END UAVCAN_Thread */
@@ -218,11 +229,17 @@ void UAVCAN_Thread(void const * argument)
 void Encoder_Thread(void const * argument)
 {
   /* USER CODE BEGIN Encoder_Thread */
-  /* Infinite loop */
-  for(;;)
-  {
-    osDelay(100);
-  }
+	encoder_init(&encoder_rpm_data);
+
+	//Only calculate after the predefined period
+	uint16_t delay_period = encoder_rpm_data.period;
+	/* Infinite loop */
+	for(;;)
+	{
+		osDelay(delay_period);
+
+		encoder_read_rpm(&encoder_rpm_data);
+	}
   /* USER CODE END Encoder_Thread */
 }
 
@@ -256,18 +273,29 @@ void CommIO_RpThread(void const * argument)
 			osMutexWait(Airspeed_MutexHandle, osWaitForever);
 
 			float airspeed = uavcan_airspeed_data.airspeed;
-			const uint32_t airspeed_timestamp = uavcan_airspeed_data.timestamp;
+			uint32_t timestamp = uavcan_airspeed_data.timestamp;
 
 			osMutexRelease(Airspeed_MutexHandle);
 
-			if (tmp - airspeed_timestamp > 2000) {
+			if (tmp - timestamp > 2000) {
 				airspeed = 0;
 			}
 
-			uint8_t buf[12];
-			comm_IO_packet_respond_encode(RESPOND, 0, airspeed, buf);
+			osMutexWait(Encoder_MutexHandle, osWaitForever);
 
-			HAL_UART_Transmit_IT(&huart2, buf, COMM_BUFFER_LENGTH);
+			uint16_t rpm = encoder_rpm_data.rpm;
+			timestamp = encoder_rpm_data.timestamp;
+
+			osMutexRelease(Encoder_MutexHandle);
+
+			if (tmp - timestamp > 2000) {
+				rpm = 0;
+			}
+
+			uint8_t buf[12];
+			comm_IO_packet_respond_encode(RESPOND, rpm, airspeed, buf);
+
+			HAL_UART_Transmit_IT(&huart1, buf, COMM_BUFFER_LENGTH);
 
 			// Hack, set the signal to RESPOND immediately because the function
 			// will clear the signal, thus blocking the thread again

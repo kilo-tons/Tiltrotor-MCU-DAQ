@@ -37,8 +37,13 @@ static float barometer_read(void){
 // Calculate airspeed from temperature and delta_P
 float airspeed_read(float temperature, float delta_p)
 {
-	const float atmospheric_pressure = barometer_read();
-	const float density = atmospheric_pressure / (DRY_AIR_R_SPECIFIC * temperature);
+	//const float atmospheric_pressure = barometer_read();
+	//const float density = atmospheric_pressure / (DRY_AIR_R_SPECIFIC * temperature);
+	const float density = 1.225f;
+
+	if (delta_p < 0) {
+		delta_p = 0;
+	}
 
 	// Since M is obviously smaller than 0.3, apply Bernoulli's Equation
 	const float airspeed = sqrtf(2 * fabsf(delta_p) / density);

@@ -62,9 +62,11 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define STATUS_LED_Pin GPIO_PIN_13
 #define STATUS_LED_GPIO_Port GPIOC
-#define ENCODER_IN_Pin GPIO_PIN_15
-#define ENCODER_IN_GPIO_Port GPIOB
-#define ENCODER_IN_EXTI_IRQn EXTI15_10_IRQn
+#define ENCODER_TEST_Pin GPIO_PIN_4
+#define ENCODER_TEST_GPIO_Port GPIOA
+#define ENCODER_IN_Pin GPIO_PIN_5
+#define ENCODER_IN_GPIO_Port GPIOA
+#define ENCODER_IN_EXTI_IRQn EXTI9_5_IRQn
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */

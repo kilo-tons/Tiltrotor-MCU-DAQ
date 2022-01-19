@@ -108,6 +108,13 @@ int main(void)
 	  Error_Handler();
   }
 
+  /* Activate TIM3 PWM chan 1 aka ESC PWM control channel*/
+  if (HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1) != HAL_OK) {
+    Error_Handler();
+  }
+
+  // Init at 1000us
+  htim3.Instance->CCR1 = 1000 - 1;
 
   /* USER CODE END 2 */
 
@@ -188,7 +195,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
   }
   /* USER CODE BEGIN Callback 1 */
   else if (htim->Instance == TIM4) {
-	  update_tick_us();
+	  update_tick_us32();
   }
   /* USER CODE END Callback 1 */
 }

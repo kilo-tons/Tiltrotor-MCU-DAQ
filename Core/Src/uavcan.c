@@ -17,6 +17,7 @@
  */
 
 #include <stdint.h>
+#include <stdio.h>
 #include "uavcan.h"
 #include "can.h"
 #include "stm32f1xx_hal.h"
@@ -110,6 +111,7 @@ static void onTransferReceived(CanardInstance* ins, CanardRxTransfer* transfer)
     }
 
     if (transfer->data_type_id == UAVCAN_EQUIPMENT_AIR_DATA_RAWAIRDATA_ID) {
+    	HAL_GPIO_TogglePin(STATUS_LED_GPIO_Port, STATUS_LED_Pin);
     	handleRawAirData(transfer);
     }
 }
@@ -127,14 +129,12 @@ static bool shouldAcceptTransfer(const CanardInstance* ins,
                                  CanardTransferType transfer_type,
                                  uint8_t source_node_id)
 {
-    // (void)source_node_id;
-
     if ((transfer_type == CanardTransferTypeRequest) &&(data_type_id == UAVCAN_PROTOCOL_GETNODEINFO_ID)) {
-        *out_data_type_signature = UAVCAN_PROTOCOL_GETNODEINFO_ID;
+        *out_data_type_signature = UAVCAN_PROTOCOL_GETNODEINFO_SIGNATURE;
         return true;
     }
     if (data_type_id == UAVCAN_EQUIPMENT_AIR_DATA_RAWAIRDATA_ID) {
-        *out_data_type_signature = UAVCAN_EQUIPMENT_AIR_DATA_RAWAIRDATA_ID;
+        *out_data_type_signature = UAVCAN_EQUIPMENT_AIR_DATA_RAWAIRDATA_SIGNATURE;
         return true;
     }
     return false;
@@ -175,7 +175,7 @@ void UAVCAN_init(void)
 void sendCanard(void)
 {
 	const CanardCANFrame* txf = canardPeekTxQueue(&g_canard);
-	while(txf) {
+	while (txf) {
 		const int tx_res = canardSTM32Transmit(txf);
 		if (tx_res < 0) {                 // Failure - drop the frame and report
 			asm("nop");
@@ -194,7 +194,7 @@ void receiveCanard(void)
     CanardCANFrame rx_frame;
     int res = canardSTM32Receive(&rx_frame);
     if(res) {
-        canardHandleRxFrame(&g_canard, &rx_frame, get_time_usec());
+        canardHandleRxFrame(&g_canard, &rx_frame, get_time_us64());
     }
 }
 

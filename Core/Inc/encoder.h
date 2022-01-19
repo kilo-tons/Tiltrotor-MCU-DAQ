@@ -16,22 +16,26 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef UTILS_H
-#define UTILS_H
+#include "main.h"
+#include "cmsis_os.h"
 
-#include <stdint.h>
+typedef struct
+{
+	uint32_t timestamp;
+	uint16_t tick; 		// Number of pulse triggered
+	uint16_t rpm;
 
-// Microsecond tick support
-uint32_t get_time_us32();
-uint64_t get_time_us64();
-void system_time_us64_init(void);
-void update_tick_us32();
+	// Config parameters
+	uint16_t freq; 		// Pre-configured frequency for RPM calculation
+	uint16_t period; 	// 1000/freq, in ms
+	uint16_t lin_count; // Number of slots on RPM encoder disk
 
-// Constraining functions
-float constrain_float(float low_bound, float high_bound, float val);
+} encoder_rpm_data_t;
 
-// CRC
-uint16_t crc16_ccitt(const uint8_t *buf, uint32_t len, uint16_t crc);
+extern osMutexId Encoder_MutexHandle;
+extern encoder_rpm_data_t encoder_rpm_data;
 
-#endif
+void encoder_init(encoder_rpm_data_t *input);
+void encoder_read_rpm(encoder_rpm_data_t *input);
 
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin);

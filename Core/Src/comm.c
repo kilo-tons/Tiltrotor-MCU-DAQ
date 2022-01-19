@@ -35,7 +35,7 @@ void comm_IO_init(void)
 void comm_IO_read_init(void)
 {
 	memset(comm_packet_buff_rx, 0, sizeof(uint8_t) * COMM_BUFFER_LENGTH);
-	HAL_UART_Receive_IT(&huart2, comm_packet_buff_rx, COMM_BUFFER_LENGTH);
+	HAL_UART_Receive_IT(&huart1, comm_packet_buff_rx, COMM_BUFFER_LENGTH);
 
 	// Create semaphore
 	osSemaphoreDef(CommIO_Read_Sem);
@@ -131,9 +131,9 @@ bool comm_IO_packet_decode(uint8_t *buf, DAQ_input_t *input)
   */
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
-	if (huart->Instance == USART2) {
+	if (huart->Instance == USART1) {
 		// Enable interrupt for another packet
-		HAL_UART_Receive_IT(&huart2, comm_packet_buff_rx, COMM_BUFFER_LENGTH);
+		HAL_UART_Receive_IT(&huart1, comm_packet_buff_rx, COMM_BUFFER_LENGTH);
 
 		if (comm_IO_packet_decode(comm_packet_buff_rx, &DAQ_input)) {
 			//Notify main thread
